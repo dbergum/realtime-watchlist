@@ -1,0 +1,44 @@
+<resources>
+    <string name="app_name">Watchlist</string>
+
+    <!-- Bottom navigation -->
+    <string name="tab_watchlist">Watchlist</string>
+    <string name="tab_search">Search</string>
+
+    <!-- Search screen -->
+    <string name="search_title">Search instruments</string>
+    <string name="search_label">Search</string>
+    <string name="search_hint">e.g. BTC, ETH, SOL</string>
+    <string name="clear_search">Clear search</string>
+    <string name="search_prompt">Search for a crypto instrument to add to your watchlist.</string>
+    <string name="search_empty">No instruments match your search.</string>
+    <string name="add_to_watchlist">Add to watchlist</string>
+    <string name="remove_from_watchlist">Remove from watchlist</string>
+    <string name="in_watchlist">In watchlist</string>
+
+    <!-- Watchlist screen -->
+    <string name="watchlist_title">Watchlist</string>
+    <string name="watchlist_empty">Your watchlist is empty.\nUse Search to add instruments.</string>
+    <string name="waiting_for_price">Waiting for price…</string>
+    <string name="stale_badge">Stale</string>
+    <string name="filter_hint">Filter watchlist</string>
+    <string name="sort_label">Sort</string>
+    <string name="sort_symbol">Symbol</string>
+    <string name="sort_price">Price</string>
+    <string name="sort_change">Change</string>
+    <string name="remove">Remove</string>
+
+    <!-- Connection banner -->
+    <string name="status_connecting">Connecting to live prices…</string>
+    <string name="status_reconnecting">Connection lost. Reconnecting…</string>
+    <string name="status_disconnected">Live prices unavailable.</string>
+
+    <!-- Demo mode -->
+    <string name="demo_mode">Demo</string>
+    <string name="demo_banner">Demo mode — showing simulated prices (no API key).</string>
+
+    <!-- Shared -->
+    <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="error_network">No internet connection. Please check your network and try again.</string>
+    <string name="retry">Retry</string>
+</resources>

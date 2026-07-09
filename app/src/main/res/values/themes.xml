@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Minimal launch theme. All UI is drawn by Compose (WatchlistTheme), so this only controls
+      the window before the first frame. NoActionBar because Compose supplies its own app bars.
+    -->
+    <style name="Theme.Watchlist" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
