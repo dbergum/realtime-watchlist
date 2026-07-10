@@ -1,7 +1,7 @@
 package com.example.watchlist.data.remote
 
-import com.example.watchlist.data.remote.dto.CandleDto
 import com.example.watchlist.data.remote.dto.CryptoSymbolDto
+import com.example.watchlist.data.remote.dto.QuoteDto
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -18,15 +18,15 @@ interface FinnhubApi {
         @Query("token") token: String,
     ): List<CryptoSymbolDto>
 
-    /** OHLC candles; we request a short recent window and use the last close as the snapshot price. */
-    @GET("api/v1/crypto/candle")
-    suspend fun cryptoCandle(
+    /**
+     * Current quote for a symbol. Works for crypto on the free plan (the `/crypto/candle` endpoint
+     * is premium), so it's used to pull a price directly without waiting for the WebSocket.
+     */
+    @GET("api/v1/quote")
+    suspend fun quote(
         @Query("symbol") symbol: String,
-        @Query("resolution") resolution: String,
-        @Query("from") from: Long,
-        @Query("to") to: Long,
         @Query("token") token: String,
-    ): CandleDto
+    ): QuoteDto
 
     companion object {
         const val BASE_URL = "https://finnhub.io/"

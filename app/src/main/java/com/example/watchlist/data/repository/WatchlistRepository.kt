@@ -26,6 +26,9 @@ interface WatchlistRepository {
 
     suspend fun remove(symbol: String)
 
-    /** Re-fetches snapshot prices for all watchlist symbols (pull-to-refresh). */
-    suspend fun refreshSnapshots()
+    /**
+     * Pulls the current price for every watchlist symbol over REST (`/quote`) and caches it, so a
+     * price appears without waiting for the WebSocket. Called on startup and on pull-to-refresh.
+     */
+    suspend fun refreshPrices()
 }

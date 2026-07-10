@@ -76,6 +76,12 @@ class WatchlistViewModel @Inject constructor(
         initialValue = WatchlistUiState.Loading,
     )
 
+    init {
+        // Pull current prices over REST at startup so rows show a value immediately, rather than
+        // waiting for the first WebSocket tick.
+        viewModelScope.launch { watchlistRepository.refreshPrices() }
+    }
+
     fun onSortChange(option: SortOption) {
         sortOption.value = option
     }
@@ -92,7 +98,7 @@ class WatchlistViewModel @Inject constructor(
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                watchlistRepository.refreshSnapshots()
+                watchlistRepository.refreshPrices()
             } finally {
                 _isRefreshing.value = false
             }

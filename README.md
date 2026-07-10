@@ -106,9 +106,23 @@ Every state the exercise calls out is represented explicitly:
 - REST errors are caught in the repository, `CancellationException` is rethrown (so superseded
   searches aren't turned into fake failures), and other failures become `Result.failure`, mapped
   to a localized message via `Throwable.toUserMessageRes()`.
-- A missing REST snapshot is **not** an error — the row simply waits for the first live tick.
+- A missing REST snapshot is **not** an error — the row falls back to the cached price, then the
+  first live tick.
 - The WebSocket reconnects with **capped exponential backoff** (1s → 2s → … → 30s), re-subscribing
   all symbols on reconnect and surfacing `RECONNECTING` to the banner.
+
+### Prices at startup (no waiting on the socket)
+
+Prices appear immediately, before the WebSocket connects, via two REST/local mechanisms:
+
+- **`/quote` on startup and add.** Finnhub's `/quote` endpoint returns the current price and works
+  for crypto on the **free** plan (unlike `/crypto/candle`, which is premium → `403`). The
+  watchlist ViewModel pulls `/quote` for every symbol on init (and on pull-to-refresh), so rows
+  show a live-ish price right away.
+- **Room price cache.** The latest price (REST or WebSocket) is written back to Room (throttled),
+  so on the next launch the last-known price is shown instantly before any network round-trip.
+
+The WebSocket then takes over for continuous, low-latency updates.
 
 ---
 
@@ -117,24 +131,33 @@ Every state the exercise calls out is represented explicitly:
 - **Crypto only.** Crypto trades 24/7 and streams on Finnhub's free plan, so live updates work at
   any hour — the most reliable choice for a reviewer. Stocks would need a paid real-time plan and
   only tick during US market hours.
-- **Client-side search.** For crypto, the app fetches the full Binance symbol list once, caches
-  it, and filters locally. This is more reliable than the generic `/search` endpoint and makes
-  subsequent searches instant/offline. Tradeoff: a larger first fetch.
-- **% change baseline.** Percentage change is measured against the REST snapshot captured when an
-  item was added (or last refreshed via pull-to-refresh), i.e. a session baseline — **not** the
-  24-hour open. This keeps the data model simple and honest about what it shows.
-- **Snapshot may be absent** on the free plan (candle history limits); the app degrades gracefully
-  to the missing-price state until the first live tick.
+- **Client-side search with ranking.** For crypto, the app fetches the full Binance symbol list
+  once, caches it, and filters locally. Results are ranked so exact/prefix matches on the base
+  asset and liquid USD/USDT quote pairs surface first — searching "BTC" returns `BTC/USDT` at the
+  top, not obscure pairs that rarely trade. More reliable than the generic `/search` endpoint and
+  keeps subsequent searches instant/offline. Tradeoff: a larger first fetch.
+- **% change baseline.** Baseline is the `/quote` price captured when an item was added; when that
+  is unavailable it falls back to the first live tick of the session. It is a session baseline —
+  **not** the 24-hour open — which keeps the data model simple and honest about what it shows.
+- **REST snapshots use `/quote`, not `/crypto/candle`.** `/crypto/candle` is premium on Finnhub's
+  free plan (returns `403`); `/quote` returns the current price for crypto on the free plan, so the
+  app pulls prices directly on startup/add/refresh. Live WebSocket **trades** for liquid Binance
+  pairs (e.g. `BINANCE:BTCUSDT`) also stream on the free plan — both verified against a free key.
 - **Foregrounded streaming.** The socket lives only while the UI observes it — no foreground
   service or background updates, which is appropriate for this scope.
 - **Free-plan limits to be aware of:** ~30 req/s and per-minute caps; a single shared WebSocket
   connection; crypto market-data availability varies by symbol.
-- **Skipped by choice** (time-box): sparkline chart, offline price cache, UI/screenshot tests.
+- **Skipped by choice** (time-box): sparkline chart, UI/screenshot tests.
 
 ### Included optional enhancements
 
 Price-movement indicators (arrow + color, tick-to-tick and vs baseline), watchlist
-**sort** (symbol / price / change) and **filter**, and **pull-to-refresh** for snapshots.
+**sort** (symbol / price / change) and **filter**, **pull-to-refresh** for snapshots, and an
+**offline price cache**: the latest live price is written back to Room (throttled per symbol), so
+on the next launch the last-known price is shown **immediately** — marked stale — instead of
+"waiting for price", and is replaced as soon as the first fresh WebSocket tick arrives. This is
+what makes prices appear at startup without waiting on the socket, which matters on the free plan
+where there is no REST spot-price endpoint for crypto.
 
 ---
 

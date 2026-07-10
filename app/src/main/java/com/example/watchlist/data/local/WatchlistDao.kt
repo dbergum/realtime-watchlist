@@ -16,8 +16,9 @@ interface WatchlistDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: WatchlistEntity)
 
-    @Query("UPDATE watchlist SET snapshotPrice = :price WHERE symbol = :symbol")
-    suspend fun updateSnapshotPrice(symbol: String, price: Double)
+    /** Updates the displayed/last price (from REST `/quote` or a live tick). */
+    @Query("UPDATE watchlist SET lastPrice = :price WHERE symbol = :symbol")
+    suspend fun updateLastPrice(symbol: String, price: Double)
 
     @Query("DELETE FROM watchlist WHERE symbol = :symbol")
     suspend fun deleteBySymbol(symbol: String)

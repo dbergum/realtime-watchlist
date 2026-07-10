@@ -31,6 +31,7 @@ class WatchlistViewModelTest {
         symbol = symbol,
         displayName = "BTC/USDT",
         snapshotPrice = 90.0,
+        lastPrice = null,
         addedAt = 0L,
     )
 
@@ -61,7 +62,7 @@ class WatchlistViewModelTest {
 
                 now = 2_000L
                 repository.livePricesFlow.value =
-                    mapOf(symbol to PriceUpdate(symbol, price = 100.0, previousPrice = 90.0, timestampMs = 2_000L))
+                    mapOf(symbol to PriceUpdate(symbol, price = 100.0, previousPrice = 90.0, openPrice = 90.0, timestampMs = 2_000L))
 
                 val ticked = awaitItem() as WatchlistUiState.Content
                 val item = ticked.items.single()
@@ -84,7 +85,7 @@ class WatchlistViewModelTest {
                 awaitItem() // initial Content with no price
 
                 repository.livePricesFlow.value =
-                    mapOf(symbol to PriceUpdate(symbol, price = 50.0, previousPrice = null, timestampMs = 0L))
+                    mapOf(symbol to PriceUpdate(symbol, price = 50.0, previousPrice = null, openPrice = 50.0, timestampMs = 0L))
 
                 val stale = awaitItem() as WatchlistUiState.Content
                 assertTrue(stale.items.single().isStale)
@@ -122,5 +123,13 @@ class WatchlistViewModelTest {
             viewModel.onRemove(symbol)
             testScheduler.advanceUntilIdle()
             assertEquals(listOf(symbol), repository.removed)
+        }
+
+    @Test
+    fun `pulls current prices over REST on init`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            viewModel()
+            testScheduler.advanceUntilIdle()
+            assertEquals(1, repository.refreshCount)
         }
 }

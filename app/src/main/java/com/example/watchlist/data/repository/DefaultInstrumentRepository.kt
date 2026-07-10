@@ -21,7 +21,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * In demo mode it serves the fixed [DemoCatalog]. In live mode it fetches the full Binance crypto
  * symbol list from Finnhub **once**, caches it, and filters client-side — this is more reliable
  * for crypto than the generic `/search` endpoint and keeps subsequent searches instant and
- * offline. Snapshots come from the last close of a short recent candle window.
+ * offline. Snapshot prices come from `/quote` (the current price), which works for crypto on the
+ * free plan.
  */
 @Singleton
 class DefaultInstrumentRepository @Inject constructor(
@@ -46,11 +47,12 @@ class DefaultInstrumentRepository @Inject constructor(
 
         return try {
             val all = loadSymbols()
+            val query = trimmed.uppercase()
             val matches = all
-                .filter {
-                    it.symbol.contains(trimmed, ignoreCase = true) ||
-                        it.displayName.contains(trimmed, ignoreCase = true)
-                }
+                .mapNotNull { instrument -> rankOf(instrument, query)?.let { instrument to it } }
+                // Rank first, then prefer shorter symbols (BTCUSDT over 1000BTCUSDT), then alpha.
+                .sortedWith(compareBy({ it.second }, { it.first.symbol.length }, { it.first.symbol }))
+                .map { it.first }
                 .take(MAX_RESULTS)
             Result.success(matches)
         } catch (e: CancellationException) {
@@ -60,20 +62,34 @@ class DefaultInstrumentRepository @Inject constructor(
         }
     }
 
+    /**
+     * Scores how well an instrument matches [query] (lower is better), or null if it doesn't match.
+     * Exact and prefix matches on the base asset rank above substring matches, and USD/USDT quote
+     * pairs (the liquid ones that actually stream trades) are preferred within each tier — so
+     * searching "BTC" surfaces "BTC/USDT" at the top instead of obscure pairs like "ENGBTC".
+     */
+    private fun rankOf(instrument: Instrument, query: String): Int? {
+        val display = instrument.displayName.uppercase()      // e.g. "BTC/USDT"
+        val base = display.substringBefore("/")               // e.g. "BTC"
+        val quote = display.substringAfter("/", "")           // e.g. "USDT"
+        val symbol = instrument.symbol.substringAfter(":").uppercase() // e.g. "BTCUSDT"
+        val liquidQuote = quote == "USDT" || quote == "USD"
+        val quoteBoost = if (liquidQuote) 0 else 1
+
+        val tier = when {
+            base == query -> 0                                // exact base match
+            base.startsWith(query) -> 2                        // base prefix, e.g. "ETH" -> "ETHFI"
+            display.contains(query) || symbol.contains(query) -> 4 // anywhere
+            else -> return null
+        }
+        return tier + quoteBoost
+    }
+
     override suspend fun snapshotPrice(symbol: String): Double? {
         if (demoMode.enabled.value) return DemoCatalog.seedPrice(symbol)
 
         return try {
-            withContext(ioDispatcher) {
-                val nowSec = System.currentTimeMillis() / 1000
-                api.cryptoCandle(
-                    symbol = symbol,
-                    resolution = SNAPSHOT_RESOLUTION,
-                    from = nowSec - SNAPSHOT_WINDOW_SEC,
-                    to = nowSec,
-                    token = apiKey,
-                ).lastClose
-            }
+            withContext(ioDispatcher) { api.quote(symbol, apiKey).price }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -95,8 +111,6 @@ class DefaultInstrumentRepository @Inject constructor(
 
     private companion object {
         const val MAX_RESULTS = 50
-        const val SNAPSHOT_RESOLUTION = "1"
-        const val SNAPSHOT_WINDOW_SEC = 3_600L
     }
 }
 

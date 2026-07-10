@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.shareIn
@@ -61,15 +62,21 @@ class DefaultWatchlistRepository @Inject constructor(
             .onStart { emit(ConnectionStatus.CONNECTING) }
             .distinctUntilChanged()
 
+    // Throttles how often each symbol's live price is written back to Room.
+    private val lastPersistedAt = HashMap<String, Long>()
+
     override val livePrices: Flow<Map<String, PriceUpdate>> =
         streamEvents
             .filterIsInstance<StreamEvent.Trade>()
+            .onEach { trade -> cacheLivePrice(trade) }
             .scan(emptyMap<String, PriceUpdate>()) { acc, trade ->
-                val previous = acc[trade.symbol]?.price
+                val existing = acc[trade.symbol]
                 acc + (trade.symbol to PriceUpdate(
                     symbol = trade.symbol,
                     price = trade.price,
-                    previousPrice = previous,
+                    previousPrice = existing?.price,
+                    // The first tick of the session anchors the change baseline.
+                    openPrice = existing?.openPrice ?: trade.price,
                     timestampMs = trade.timestampMs,
                 ))
             }
@@ -82,16 +89,33 @@ class DefaultWatchlistRepository @Inject constructor(
                 symbol = instrument.symbol,
                 displayName = instrument.displayName,
                 snapshotPrice = snapshot,
+                // Seed the cached price with the snapshot so a just-added row shows a value at once.
+                lastPrice = snapshot,
                 addedAt = System.currentTimeMillis(),
             ),
         )
     }
 
+    /**
+     * Persists the latest live price to Room so it can be shown immediately on the next launch.
+     * Rate-limited per symbol to avoid hammering the database on every tick.
+     */
+    private suspend fun cacheLivePrice(trade: StreamEvent.Trade) {
+        val now = System.currentTimeMillis()
+        val previous = lastPersistedAt[trade.symbol] ?: 0L
+        if (now - previous >= PRICE_PERSIST_INTERVAL_MS) {
+            lastPersistedAt[trade.symbol] = now
+            runCatching { dao.updateLastPrice(trade.symbol, trade.price) }
+        }
+    }
+
     override suspend fun remove(symbol: String) = dao.deleteBySymbol(symbol)
 
-    override suspend fun refreshSnapshots() {
+    override suspend fun refreshPrices() {
         dao.allSymbols().forEach { symbol ->
-            instrumentRepository.snapshotPrice(symbol)?.let { dao.updateSnapshotPrice(symbol, it) }
+            // Update the displayed (last) price, not the snapshot baseline, so % change stays
+            // anchored to the add-time price.
+            instrumentRepository.snapshotPrice(symbol)?.let { dao.updateLastPrice(symbol, it) }
         }
     }
 
@@ -99,5 +123,6 @@ class DefaultWatchlistRepository @Inject constructor(
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+        const val PRICE_PERSIST_INTERVAL_MS = 10_000L
     }
 }

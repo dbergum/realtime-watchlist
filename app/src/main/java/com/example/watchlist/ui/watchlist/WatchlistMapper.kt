@@ -18,18 +18,27 @@ object WatchlistMapper {
         nowMs: Long,
         staleThresholdMs: Long = STALE_THRESHOLD_MS,
     ): WatchlistItem {
-        val price = update?.price
-        val baseline = instrument.snapshotPrice
-        val changePercent = if (price != null && baseline != null && baseline != 0.0) {
-            (price - baseline) / baseline * 100.0
+        val livePrice = update?.price
+        // Show the live price if we have one; otherwise fall back to the price in Room (a REST
+        // snapshot pulled at startup, or the last cached tick) so a value appears immediately
+        // instead of "waiting for price".
+        val displayPrice = livePrice ?: instrument.lastPrice
+        // Baseline for % change is the add-time snapshot; fall back to the session-open price from
+        // the live stream if no snapshot was captured.
+        val baseline = instrument.snapshotPrice ?: update?.openPrice
+        val changePercent = if (displayPrice != null && baseline != null && baseline != 0.0) {
+            (displayPrice - baseline) / baseline * 100.0
         } else {
             null
         }
+        // Staleness reflects the live stream: a tick is stale once it's older than the threshold.
+        // A REST/cached price shown before the socket connects isn't flagged (the connection
+        // banner communicates that live data isn't flowing yet).
         val isStale = update != null && (nowMs - update.timestampMs) > staleThresholdMs
         return WatchlistItem(
             symbol = instrument.symbol,
             displayName = instrument.displayName,
-            price = price,
+            price = displayPrice,
             changePercent = changePercent,
             movement = update?.movement ?: PriceMovement.FLAT,
             isStale = isStale,

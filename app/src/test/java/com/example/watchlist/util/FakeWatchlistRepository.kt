@@ -34,7 +34,7 @@ class FakeWatchlistRepository : WatchlistRepository {
         watchlistFlow.value = watchlistFlow.value.filterNot { it.symbol == symbol }
     }
 
-    override suspend fun refreshSnapshots() {
+    override suspend fun refreshPrices() {
         refreshCount++
     }
 }

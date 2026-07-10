@@ -11,14 +11,14 @@ import org.junit.Test
 
 class WatchlistMapperTest {
 
-    private fun instrument(symbol: String, snapshot: Double? = 100.0) =
-        WatchlistInstrument(symbol, symbol, snapshot, addedAt = 0L)
+    private fun instrument(symbol: String, snapshot: Double? = 100.0, lastPrice: Double? = null) =
+        WatchlistInstrument(symbol, symbol, snapshot, lastPrice, addedAt = 0L)
 
     @Test
     fun `buildItem computes percent change against the snapshot baseline`() {
         val item = WatchlistMapper.buildItem(
             instrument = instrument("A", snapshot = 100.0),
-            update = PriceUpdate("A", price = 110.0, previousPrice = 105.0, timestampMs = 0L),
+            update = PriceUpdate("A", price = 110.0, previousPrice = 105.0, openPrice = 105.0, timestampMs = 0L),
             nowMs = 0L,
         )
         assertEquals(110.0, item.price)
@@ -27,7 +27,18 @@ class WatchlistMapperTest {
     }
 
     @Test
-    fun `buildItem leaves price and change null when there is no update`() {
+    fun `buildItem falls back to session-open price when no snapshot is available`() {
+        val item = WatchlistMapper.buildItem(
+            instrument = instrument("A", snapshot = null),
+            update = PriceUpdate("A", price = 120.0, previousPrice = 115.0, openPrice = 100.0, timestampMs = 0L),
+            nowMs = 0L,
+        )
+        // Baseline = openPrice (100), so change is +20%.
+        assertEquals(20.0, item.changePercent!!, 0.0001)
+    }
+
+    @Test
+    fun `buildItem leaves price and change null when there is no update or cached price`() {
         val item = WatchlistMapper.buildItem(instrument("A"), update = null, nowMs = 0L)
         assertNull(item.price)
         assertNull(item.changePercent)
@@ -35,8 +46,20 @@ class WatchlistMapperTest {
     }
 
     @Test
+    fun `buildItem shows the cached Room price with change and does not flag it stale`() {
+        val item = WatchlistMapper.buildItem(
+            instrument = instrument("A", snapshot = 100.0, lastPrice = 110.0),
+            update = null,
+            nowMs = 0L,
+        )
+        assertEquals(110.0, item.price)
+        assertEquals(10.0, item.changePercent!!, 0.0001)
+        assertFalse(item.isStale)
+    }
+
+    @Test
     fun `buildItem flags stale when the update is older than the threshold`() {
-        val update = PriceUpdate("A", price = 1.0, previousPrice = null, timestampMs = 0L)
+        val update = PriceUpdate("A", price = 1.0, previousPrice = null, openPrice = 1.0, timestampMs = 0L)
         val fresh = WatchlistMapper.buildItem(instrument("A"), update, nowMs = 10_000L, staleThresholdMs = 15_000L)
         val stale = WatchlistMapper.buildItem(instrument("A"), update, nowMs = 20_000L, staleThresholdMs = 15_000L)
         assertFalse(fresh.isStale)
