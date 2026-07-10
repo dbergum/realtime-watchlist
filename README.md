@@ -9,6 +9,10 @@ Compose, Coroutines/Flow, Hilt, Room, Retrofit, and OkHttp's WebSocket client, a
 > shows simulated, ticking prices — so a reviewer can experience the full flow offline, with no
 > dependency on Finnhub availability, market hours, or rate limits.
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="Watchlist screen showing live crypto prices with movement and % change" width="300"/>
+</p>
+
 ---
 
 ## Build & run
@@ -182,3 +186,9 @@ coroutines test dispatcher; ViewModels are exercised against in-memory fakes.
 This project was built with the assistance of **Claude Code** (Anthropic) for scaffolding,
 boilerplate, and documentation, under my direction and review. All architectural decisions,
 tradeoffs, and the final code were reviewed and verified by me.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
