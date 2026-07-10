@@ -2,11 +2,11 @@ package com.example.watchlist.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Brand palette.
-val Teal = Color(0xFF11B0C8)
-val TealDark = Color(0xFF0A7C8F)
-val TealContainer = Color(0xFFA8EEF7)
-val OnTealContainer = Color(0xFF00363F)
+// Brand palette — neon green.
+val NeonGreen = Color(0xFF39FF14)          // signature neon green (dark-theme primary)
+val NeonGreenDark = Color(0xFF12B000)      // deeper neon for the light-theme primary
+val NeonGreenContainer = Color(0xFFC7FFB0) // pale neon for app-bar / containers
+val OnNeonGreenContainer = Color(0xFF063100) // deep green used for text/icons on neon surfaces
 
 // Price movement colors, tuned so both read clearly on light and dark surfaces.
 val GainGreen = Color(0xFF1B873F)
