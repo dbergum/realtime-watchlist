@@ -63,6 +63,35 @@ Single-module, layered, feature-packaged. Unidirectional data flow: repositories
 ViewModels fold them into immutable UI state exposed as `StateFlow`, Compose collects with
 `collectAsStateWithLifecycle()`.
 
+```mermaid
+flowchart TD
+    subgraph UI["UI · Jetpack Compose"]
+        WLS["WatchlistScreen"]
+        SRS["SearchScreen"]
+    end
+    subgraph VM["ViewModels · StateFlow"]
+        WVM["WatchlistViewModel"]
+        SVM["SearchViewModel"]
+    end
+    subgraph REPO["Repositories · Flow / Result"]
+        WR["WatchlistRepository"]
+        IR["InstrumentRepository"]
+    end
+    ROOM[("Room DB · watchlist + cached prices")]
+    REST["Finnhub REST · symbol search · /quote"]
+    SOCK["Finnhub WebSocket · live trades"]
+
+    WLS -. observes .-> WVM
+    SRS -. observes .-> SVM
+    WVM --> WR
+    SVM --> IR
+    SVM --> WR
+    WR -->|observe + persist| ROOM
+    WR -->|subscribe + stream| SOCK
+    WR -->|initial snapshot| IR
+    IR -->|search + quote| REST
+```
+
 ```
 ui/            Compose screens + ViewModels (search, watchlist) + shared components
   search/      SearchScreen · SearchViewModel · SearchUiState
